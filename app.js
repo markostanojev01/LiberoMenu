@@ -7,32 +7,51 @@
 // ----------------------------------------------------------
 const CONFIG = {
   // Replace with your published Google Sheet CSV URL
-  SHEET_CSV_URL: 'https://script.google.com/macros/s/AKfycbyjuDHlU4XfkdfIZXBqk7XTHHnVa4WhvoNlnGBt-oaFo97UXsknKqOjTW94No3IFfzP/exec',
-  CACHE_KEY: 'libero_menu_data',
-  CACHE_TIMESTAMP_KEY: 'libero_menu_ts',
+  SHEET_CSV_URL:
+    "https://script.google.com/macros/s/AKfycbyjuDHlU4XfkdfIZXBqk7XTHHnVa4WhvoNlnGBt-oaFo97UXsknKqOjTW94No3IFfzP/exec",
+  CACHE_KEY: "libero_menu_data",
+  CACHE_TIMESTAMP_KEY: "libero_menu_ts",
   CACHE_TTL: 5 * 60 * 1000, // 5 minutes
-  IMAGE_BASE_PATH: 'assets/images/',
-  PLACEHOLDER_IMAGE: 'assets/images/placeholder.svg',
-  CURRENCY: 'RSD',
-  PHONE_NUMBER: '+381693336303',
-  MAPS_URL: 'https://www.google.com/maps/place/Libero+Fast+Food/@43.902285,22.27958,20z/data=!4m6!3m5!1s0x475473005fce1ab9:0x5deb13694bb3f3f9!8m2!3d43.9021943!4d22.2796925!16s%2Fg%2F11xvbp01kn?entry=ttu&g_ep=EgoyMDI2MDIwNC4wIKXMDSoASAFQAw%3D%3D',
+  IMAGE_BASE_PATH: "assets/images/",
+  PLACEHOLDER_IMAGE: "assets/images/placeholder.svg",
+  CURRENCY: "RSD",
+  PHONE_NUMBER: "+381693336303",
+  MAPS_URL:
+    "https://www.google.com/maps/place/Libero+Fast+Food/@43.902285,22.27958,20z/data=!4m6!3m5!1s0x475473005fce1ab9:0x5deb13694bb3f3f9!8m2!3d43.9021943!4d22.2796925!16s%2Fg%2F11xvbp01kn?entry=ttu&g_ep=EgoyMDI2MDIwNC4wIKXMDSoASAFQAw%3D%3D",
 };
 
+/** Pica (pizza) size order; price format from sheet is "1200/1500/2000" → S/M/XL. Non-numeric segment = size not available. */
+const PICA_SIZE_LABELS = ["S", "M", "XL"];
+
+function parsePicaPrice(val) {
+  if (val == null || val === "") return [];
+  const str = String(val).trim();
+  if (!str.includes("/")) return [];
+  const parts = str.split("/").map((p) => p.trim());
+  const result = [];
+  PICA_SIZE_LABELS.forEach((label, i) => {
+    const part = parts[i];
+    const num = part != null ? Number(part) : NaN;
+    if (Number.isFinite(num) && num > 0) {
+      result.push({ label, price: num });
+    }
+  });
+  return result;
+}
 
 // ----------------------------------------------------------
 // 2. STATE
 // ----------------------------------------------------------
 let allDishes = [];
-let currentSort = 'recommended';
-let currentQuery = '';
-let currentCategory = 'all';
+let currentSort = "recommended";
+let currentQuery = "";
+let currentCategory = "all";
 let lazyObserver = null;
-
 
 // ----------------------------------------------------------
 // 3. INITIALIZATION
 // ----------------------------------------------------------
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   initHeaderLinks();
@@ -40,6 +59,7 @@ async function init() {
   initSort();
   initCategoryFilter();
   initOfflineDetection();
+  if (typeof initCart === "function") initCart();
 
   const dishes = await fetchMenuData();
   if (dishes && dishes.length > 0) {
@@ -50,8 +70,8 @@ async function init() {
 }
 
 function initHeaderLinks() {
-  const phoneLink = document.getElementById('phone-link');
-  const mapsLink = document.getElementById('maps-link');
+  const phoneLink = document.getElementById("phone-link");
+  const mapsLink = document.getElementById("maps-link");
   if (phoneLink && CONFIG.PHONE_NUMBER) {
     phoneLink.href = `tel:${CONFIG.PHONE_NUMBER}`;
   }
@@ -59,7 +79,6 @@ function initHeaderLinks() {
     mapsLink.href = CONFIG.MAPS_URL;
   }
 }
-
 
 // ----------------------------------------------------------
 // 4. DATA FETCHING & CACHING
@@ -69,8 +88,8 @@ async function fetchMenuData() {
   if (!CONFIG.SHEET_CSV_URL) {
     removeSkeletons();
     renderEmptyState(
-      'Meni jos nije povezan',
-      'Dodajte Google Sheet CSV URL u app.js konfiguraciju.'
+      "Meni jos nije povezan",
+      "Dodajte Google Sheet CSV URL u app.js konfiguraciju.",
     );
     return [];
   }
@@ -118,7 +137,7 @@ async function fetchFresh(cached) {
     }
     return dishes;
   } catch (error) {
-    console.error('Menu fetch failed:', error);
+    console.error("Menu fetch failed:", error);
 
     if (cached) {
       renderOfflineBadge(true);
@@ -127,8 +146,8 @@ async function fetchFresh(cached) {
 
     removeSkeletons();
     renderEmptyState(
-      'Meni trenutno nije dostupan',
-      'Proverite internet konekciju i pokusajte ponovo.'
+      "Meni trenutno nije dostupan",
+      "Proverite internet konekciju i pokusajte ponovo.",
     );
     return [];
   }
@@ -157,9 +176,8 @@ function setCachedData(dishes) {
 function isCacheValid() {
   const cached = getCachedData();
   if (!cached) return false;
-  return (Date.now() - cached.timestamp) < CONFIG.CACHE_TTL;
+  return Date.now() - cached.timestamp < CONFIG.CACHE_TTL;
 }
-
 
 // ----------------------------------------------------------
 // 5. CSV PARSING
@@ -173,45 +191,59 @@ function parseCSV(csvString) {
   });
 
   if (result.errors.length > 0) {
-    console.warn('CSV parse warnings:', result.errors);
+    console.warn("CSV parse warnings:", result.errors);
   }
 
   return result.data
-    .filter(row => {
+    .filter((row) => {
       const active = row.Active;
-      return active === true || active === 'TRUE' || active === 'true';
+      return active === true || active === "TRUE" || active === "true";
     })
     .map(transformRow);
 }
 
 function transformRow(row) {
+  const category = String(row.Category || "").trim();
+  const isPica = category.toLowerCase() === "pice";
+
+  let price = Number(row.Price) || 0;
+  let variants = parseVariants(row.Variants);
+
+  if (isPica) {
+    const picaSizes = parsePicaPrice(row.Price);
+    if (picaSizes.length > 0) {
+      variants = picaSizes;
+      price = picaSizes[0].price;
+    }
+  }
+
   return {
-    category: String(row.Category || '').trim(),
+    category,
     sortOrder: Number(row.SortOrder) || 0,
-    name: String(row.Name || '').trim(),
-    description: String(row.Description || '').trim(),
-    ingredients: String(row.Ingredients || '').trim(),
-    allergens: String(row.Allergens || '').trim(),
-    price: Number(row.Price) || 0,
-    variants: parseVariants(row.Variants),
-    imageUrl: String(row.ImageUrl || '').trim(),
+    name: String(row.Name || "").trim(),
+    description: String(row.Description || "").trim(),
+    ingredients: String(row.Ingredients || "").trim(),
+    allergens: String(row.Allergens || "").trim(),
+    price,
+    variants,
+    imageUrl: String(row.ImageUrl || "").trim(),
     tags: parseTags(row.Tags),
   };
 }
 
 function parseTags(tagString) {
-  if (!tagString || typeof tagString !== 'string') return [];
+  if (!tagString || typeof tagString !== "string") return [];
   return tagString
-    .split(',')
-    .map(t => t.trim())
+    .split(",")
+    .map((t) => t.trim())
     .filter(Boolean);
 }
 
 function parseVariants(variantString) {
-  if (!variantString || typeof variantString !== 'string') return [];
+  if (!variantString || typeof variantString !== "string") return [];
   return variantString
-    .split('|')
-    .map(v => {
+    .split("|")
+    .map((v) => {
       const trimmed = v.trim();
       if (!trimmed) return null;
       // Match "Label Price" pattern, e.g., "Mali 650" or "0.25L 200"
@@ -224,15 +256,14 @@ function parseVariants(variantString) {
     .filter(Boolean);
 }
 
-
 // ----------------------------------------------------------
 // 6. RENDERING
 // ----------------------------------------------------------
 function renderMenu(dishes) {
   removeSkeletons();
 
-  const container = document.getElementById('menu-container');
-  container.innerHTML = '';
+  const container = document.getElementById("menu-container");
+  container.innerHTML = "";
 
   let filtered = filterByCategory(filterByQuery(dishes, currentQuery));
   const grouped = groupByCategory(filtered);
@@ -241,7 +272,7 @@ function renderMenu(dishes) {
     if (currentQuery) {
       renderEmptyState(
         `Nema rezultata za "${escapeHtml(currentQuery)}"`,
-        'Pokusajte sa drugim pojmom za pretragu.'
+        "Pokusajte sa drugim pojmom za pretragu.",
       );
     }
     return;
@@ -259,8 +290,8 @@ function renderMenu(dishes) {
 function renderMenuProgressive(dishes) {
   removeSkeletons();
 
-  const container = document.getElementById('menu-container');
-  container.innerHTML = '';
+  const container = document.getElementById("menu-container");
+  container.innerHTML = "";
 
   const filtered = filterByCategory(filterByQuery(dishes, currentQuery));
   const grouped = groupByCategory(filtered);
@@ -269,7 +300,7 @@ function renderMenuProgressive(dishes) {
     if (currentQuery) {
       renderEmptyState(
         `Nema rezultata za "${escapeHtml(currentQuery)}"`,
-        'Pokusajte sa drugim pojmom za pretragu.'
+        "Pokusajte sa drugim pojmom za pretragu.",
       );
     }
     return;
@@ -290,7 +321,7 @@ function renderMenuProgressive(dishes) {
     index++;
 
     // Lazy-load images for this batch right away
-    section.querySelectorAll('.dish-card__image[data-src]').forEach(img => {
+    section.querySelectorAll(".dish-card__image[data-src]").forEach((img) => {
       if (lazyObserver) lazyObserver.observe(img);
     });
 
@@ -308,8 +339,8 @@ function groupByCategory(dishes) {
   const categoryOrder = [];
   const groups = {};
 
-  dishes.forEach(dish => {
-    const cat = dish.category || 'Ostalo';
+  dishes.forEach((dish) => {
+    const cat = dish.category || "Ostalo";
     if (!groups[cat]) {
       groups[cat] = [];
       categoryOrder.push(cat);
@@ -317,7 +348,7 @@ function groupByCategory(dishes) {
     groups[cat].push(dish);
   });
 
-  return categoryOrder.map(cat => ({
+  return categoryOrder.map((cat) => ({
     category: cat,
     items: groups[cat],
   }));
@@ -326,10 +357,10 @@ function groupByCategory(dishes) {
 function sortDishes(dishes, mode) {
   const sorted = [...dishes];
   switch (mode) {
-    case 'price-asc':
+    case "price-asc":
       sorted.sort((a, b) => getEffectivePrice(a) - getEffectivePrice(b));
       break;
-    case 'price-desc':
+    case "price-desc":
       sorted.sort((a, b) => getEffectivePrice(b) - getEffectivePrice(a));
       break;
     default: // 'recommended'
@@ -340,82 +371,104 @@ function sortDishes(dishes, mode) {
 
 function getEffectivePrice(dish) {
   if (dish.variants.length > 0) {
-    return Math.min(...dish.variants.map(v => v.price));
+    return Math.min(...dish.variants.map((v) => v.price));
   }
   return dish.price;
 }
 
 function createCategorySection(category, dishes) {
-  const section = document.createElement('section');
-  section.className = 'category-section';
-  section.setAttribute('data-category', category);
+  const section = document.createElement("section");
+  section.className = "category-section";
+  section.setAttribute("data-category", category);
 
-  const header = document.createElement('h2');
-  header.className = 'category-header';
+  const header = document.createElement("h2");
+  header.className = "category-header";
   header.textContent = category;
 
   section.appendChild(header);
 
-  dishes.forEach(dish => {
-    section.appendChild(createDishCard(dish));
+  dishes.forEach((dish) => {
+    const card = createDishCard(dish);
+    if (typeof makeDishCardTappable === "function") {
+      makeDishCardTappable(card, dish);
+    }
+    section.appendChild(card);
   });
 
   return section;
 }
 
 function createDishCard(dish) {
-  const card = document.createElement('article');
-  card.className = 'dish-card';
+  const card = document.createElement("article");
+  card.className = "dish-card";
 
   // Image
-  const imageWrap = document.createElement('div');
-  imageWrap.className = 'dish-card__image-wrap';
+  const imageWrap = document.createElement("div");
+  imageWrap.className = "dish-card__image-wrap";
 
-  const img = document.createElement('img');
-  img.className = 'dish-card__image';
+  const img = document.createElement("img");
+  img.className = "dish-card__image";
   img.alt = dish.name;
   img.width = 76;
   img.height = 76;
   if (dish.imageUrl) {
-    img.setAttribute('data-src', CONFIG.IMAGE_BASE_PATH + dish.imageUrl);
+    img.setAttribute("data-src", CONFIG.IMAGE_BASE_PATH + dish.imageUrl);
   } else {
-    img.setAttribute('data-src', CONFIG.PLACEHOLDER_IMAGE);
+    img.setAttribute("data-src", CONFIG.PLACEHOLDER_IMAGE);
   }
   imageWrap.appendChild(img);
 
   // Info block
-  const info = document.createElement('div');
-  info.className = 'dish-card__info';
+  const info = document.createElement("div");
+  info.className = "dish-card__info";
 
-  const name = document.createElement('h3');
-  name.className = 'dish-card__name';
+  const name = document.createElement("h3");
+  name.className = "dish-card__name";
   name.textContent = dish.name;
   info.appendChild(name);
 
   if (dish.description) {
-    const desc = document.createElement('p');
-    desc.className = 'dish-card__description';
+    const desc = document.createElement("p");
+    desc.className = "dish-card__description";
     desc.textContent = dish.description;
     info.appendChild(desc);
   }
 
   // Tags
   if (dish.tags.length > 0) {
-    const meta = document.createElement('div');
-    meta.className = 'dish-card__meta';
-    dish.tags.forEach(tag => {
+    const meta = document.createElement("div");
+    meta.className = "dish-card__meta";
+    dish.tags.forEach((tag) => {
       meta.appendChild(createTagBadge(tag));
     });
     info.appendChild(meta);
   }
 
-  // Variants
-  if (dish.variants.length > 0) {
-    const variantList = document.createElement('div');
-    variantList.className = 'variant-list';
-    dish.variants.forEach(v => {
-      const pill = document.createElement('span');
-      pill.className = 'variant-pill';
+  // Pica: special size strip (S / M / XL)
+  if (dish.category === "Pica" && dish.variants.length > 0) {
+    const pizzaSizes = document.createElement("div");
+    pizzaSizes.className = "pizza-sizes";
+    dish.variants.forEach((v, i) => {
+      const chip = document.createElement("span");
+      chip.className = "pizza-size-chip";
+      chip.innerHTML = `<span class="pizza-size-chip__label">${v.label}</span><span class="pizza-size-chip__price">${formatPrice(v.price)}</span>`;
+      pizzaSizes.appendChild(chip);
+      if (i < dish.variants.length - 1) {
+        const sep = document.createElement("span");
+        sep.className = "pizza-sizes__sep";
+        sep.setAttribute("aria-hidden", "true");
+        sep.textContent = "·";
+        pizzaSizes.appendChild(sep);
+      }
+    });
+    info.appendChild(pizzaSizes);
+  } else if (dish.variants.length > 0) {
+    // Standard variants
+    const variantList = document.createElement("div");
+    variantList.className = "variant-list";
+    dish.variants.forEach((v) => {
+      const pill = document.createElement("span");
+      pill.className = "variant-pill";
       pill.textContent = `${v.label} ${formatPrice(v.price)}`;
       variantList.appendChild(pill);
     });
@@ -424,8 +477,8 @@ function createDishCard(dish) {
 
   // Allergens
   if (dish.allergens) {
-    const allergens = document.createElement('span');
-    allergens.className = 'dish-card__allergens';
+    const allergens = document.createElement("span");
+    allergens.className = "dish-card__allergens";
     allergens.textContent = dish.allergens;
     info.appendChild(allergens);
   }
@@ -435,8 +488,8 @@ function createDishCard(dish) {
   card.appendChild(info);
 
   if (dish.variants.length === 0 && dish.price > 0) {
-    const price = document.createElement('span');
-    price.className = 'dish-card__price';
+    const price = document.createElement("span");
+    price.className = "dish-card__price";
     price.textContent = formatPrice(dish.price);
     card.appendChild(price);
   }
@@ -445,12 +498,12 @@ function createDishCard(dish) {
 }
 
 function createTagBadge(tag) {
-  const badge = document.createElement('span');
-  const normalized = tag.toLowerCase().replace(/[^a-z]/g, '');
-  badge.className = 'tag-badge';
+  const badge = document.createElement("span");
+  const normalized = tag.toLowerCase().replace(/[^a-z]/g, "");
+  badge.className = "tag-badge";
 
   // Look up config from tags-config.js
-  const config = (typeof TAGS_CONFIG !== 'undefined') && TAGS_CONFIG[normalized];
+  const config = typeof TAGS_CONFIG !== "undefined" && TAGS_CONFIG[normalized];
 
   if (config) {
     badge.textContent = config.label || tag;
@@ -464,38 +517,37 @@ function createTagBadge(tag) {
 }
 
 function removeSkeletons() {
-  const skeleton = document.getElementById('skeleton-loader');
+  const skeleton = document.getElementById("skeleton-loader");
   if (skeleton) skeleton.remove();
 }
 
 function renderEmptyState(title, text) {
-  const container = document.getElementById('menu-container');
+  const container = document.getElementById("menu-container");
   container.innerHTML = `
     <div class="empty-state">
       <div class="empty-state__icon">🍽</div>
       <h2 class="empty-state__title">${title}</h2>
-      <p class="empty-state__text">${text || ''}</p>
+      <p class="empty-state__text">${text || ""}</p>
     </div>
   `;
 }
-
 
 // ----------------------------------------------------------
 // 7. SEARCH
 // ----------------------------------------------------------
 function initSearch() {
-  const toggle = document.getElementById('search-toggle');
-  const container = document.getElementById('search-container');
-  const input = document.getElementById('search-input');
-  const clearBtn = document.getElementById('search-clear');
+  const toggle = document.getElementById("search-toggle");
+  const container = document.getElementById("search-container");
+  const input = document.getElementById("search-input");
+  const clearBtn = document.getElementById("search-clear");
 
-  toggle.addEventListener('click', () => {
+  toggle.addEventListener("click", () => {
     const isHidden = container.hidden;
     container.hidden = !isHidden;
     if (!isHidden) {
       // Closing search
-      input.value = '';
-      currentQuery = '';
+      input.value = "";
+      currentQuery = "";
       clearBtn.hidden = true;
       if (allDishes.length > 0) renderMenu(allDishes);
     } else {
@@ -504,15 +556,18 @@ function initSearch() {
     }
   });
 
-  input.addEventListener('input', debounce(() => {
-    currentQuery = input.value.trim();
-    clearBtn.hidden = !currentQuery;
-    if (allDishes.length > 0) renderMenu(allDishes);
-  }, 300));
+  input.addEventListener(
+    "input",
+    debounce(() => {
+      currentQuery = input.value.trim();
+      clearBtn.hidden = !currentQuery;
+      if (allDishes.length > 0) renderMenu(allDishes);
+    }, 300),
+  );
 
-  clearBtn.addEventListener('click', () => {
-    input.value = '';
-    currentQuery = '';
+  clearBtn.addEventListener("click", () => {
+    input.value = "";
+    currentQuery = "";
     clearBtn.hidden = true;
     if (allDishes.length > 0) renderMenu(allDishes);
     input.focus();
@@ -522,7 +577,7 @@ function initSearch() {
 function filterByQuery(dishes, query) {
   if (!query || query.length < 3) return dishes;
   const normalized = normalizeText(query);
-  return dishes.filter(dish => {
+  return dishes.filter((dish) => {
     return (
       normalizeText(dish.name).includes(normalized) ||
       normalizeText(dish.description).includes(normalized) ||
@@ -532,31 +587,30 @@ function filterByQuery(dishes, query) {
 }
 
 function normalizeText(str) {
-  if (!str) return '';
+  if (!str) return "";
   return str
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
-
 
 // ----------------------------------------------------------
 // 8. CATEGORY FILTER
 // ----------------------------------------------------------
 function initCategoryFilter() {
-  const select = document.getElementById('category-select');
-  select.addEventListener('change', () => {
+  const select = document.getElementById("category-select");
+  select.addEventListener("change", () => {
     currentCategory = select.value;
     if (allDishes.length > 0) renderMenu(allDishes);
   });
 }
 
 function buildCategoryFilter(dishes) {
-  const select = document.getElementById('category-select');
+  const select = document.getElementById("category-select");
 
   // Get distinct categories in sheet order
   const categories = [];
-  dishes.forEach(d => {
+  dishes.forEach((d) => {
     if (d.category && !categories.includes(d.category)) {
       categories.push(d.category);
     }
@@ -566,103 +620,102 @@ function buildCategoryFilter(dishes) {
   const previousValue = currentCategory;
 
   // Rebuild options
-  select.innerHTML = '';
+  select.innerHTML = "";
 
-  const allOption = document.createElement('option');
-  allOption.value = 'all';
-  allOption.textContent = 'Sve kategorije';
+  const allOption = document.createElement("option");
+  allOption.value = "all";
+  allOption.textContent = "Sve kategorije";
   select.appendChild(allOption);
 
-  categories.forEach(cat => {
-    const option = document.createElement('option');
+  categories.forEach((cat) => {
+    const option = document.createElement("option");
     option.value = cat;
     option.textContent = cat;
     select.appendChild(option);
   });
 
   // Restore selection
-  if (categories.includes(previousValue) || previousValue === 'all') {
+  if (categories.includes(previousValue) || previousValue === "all") {
     select.value = previousValue;
   } else {
-    select.value = 'all';
-    currentCategory = 'all';
+    select.value = "all";
+    currentCategory = "all";
   }
 }
 
 function filterByCategory(dishes) {
-  if (currentCategory === 'all') return dishes;
-  return dishes.filter(d => d.category === currentCategory);
+  if (currentCategory === "all") return dishes;
+  return dishes.filter((d) => d.category === currentCategory);
 }
-
 
 // ----------------------------------------------------------
 // 9. SORT
 // ----------------------------------------------------------
 function initSort() {
-  const buttons = document.querySelectorAll('.sort-btn');
-  buttons.forEach(btn => {
-    btn.addEventListener('click', () => {
+  const buttons = document.querySelectorAll(".sort-btn");
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
       const mode = btn.dataset.sort;
       if (mode === currentSort) return;
 
       currentSort = mode;
-      buttons.forEach(b => b.classList.remove('sort-btn--active'));
-      btn.classList.add('sort-btn--active');
+      buttons.forEach((b) => b.classList.remove("sort-btn--active"));
+      btn.classList.add("sort-btn--active");
 
       if (allDishes.length > 0) renderMenu(allDishes);
     });
   });
 }
 
-
 // ----------------------------------------------------------
 // 9. LAZY IMAGE LOADING
 // ----------------------------------------------------------
 function initLazyLoading() {
-  const images = document.querySelectorAll('.dish-card__image[data-src]');
-  if ('IntersectionObserver' in window) {
+  const images = document.querySelectorAll(".dish-card__image[data-src]");
+  if ("IntersectionObserver" in window) {
     // Reuse or create observer
     if (!lazyObserver) {
       lazyObserver = new IntersectionObserver(onImageIntersect, {
-        rootMargin: '200px 0px',
+        rootMargin: "200px 0px",
         threshold: 0.01,
       });
     }
-    images.forEach(img => lazyObserver.observe(img));
+    images.forEach((img) => lazyObserver.observe(img));
   } else {
     // Fallback: load all images immediately
-    images.forEach(img => {
+    images.forEach((img) => {
       img.src = img.dataset.src;
-      img.removeAttribute('data-src');
-      img.classList.add('loaded');
+      img.removeAttribute("data-src");
+      img.classList.add("loaded");
     });
   }
 }
 
 function onImageIntersect(entries, observer) {
-  entries.forEach(entry => {
+  entries.forEach((entry) => {
     if (!entry.isIntersecting) return;
     const img = entry.target;
     img.src = img.dataset.src;
-    img.removeAttribute('data-src');
-    img.addEventListener('load', () => img.classList.add('loaded'), { once: true });
-    img.addEventListener('error', () => handleImageError(img), { once: true });
+    img.removeAttribute("data-src");
+    img.addEventListener("load", () => img.classList.add("loaded"), {
+      once: true,
+    });
+    img.addEventListener("error", () => handleImageError(img), { once: true });
     observer.unobserve(img);
   });
 }
 
 function handleImageError(img) {
   img.src = CONFIG.PLACEHOLDER_IMAGE;
-  img.classList.add('loaded');
+  img.classList.add("loaded");
 }
-
 
 // ----------------------------------------------------------
 // 10. OFFLINE DETECTION
 // ----------------------------------------------------------
 function initOfflineDetection() {
-  window.addEventListener('online', handleOnline);
-  window.addEventListener('offline', handleOffline);
+  window.addEventListener("online", handleOnline);
+  window.addEventListener("offline", handleOffline);
 
   if (!navigator.onLine) {
     renderOfflineBadge(true);
@@ -672,7 +725,7 @@ function initOfflineDetection() {
 function handleOnline() {
   renderOfflineBadge(false);
   // Attempt a background refresh
-  fetchMenuData().then(dishes => {
+  fetchMenuData().then((dishes) => {
     if (dishes && dishes.length > 0) {
       allDishes = dishes;
       renderMenu(allDishes);
@@ -685,12 +738,11 @@ function handleOffline() {
 }
 
 function renderOfflineBadge(show) {
-  const badge = document.getElementById('offline-badge');
+  const badge = document.getElementById("offline-badge");
   if (badge) {
     badge.hidden = !show;
   }
 }
-
 
 // ----------------------------------------------------------
 // 11. UTILITIES
@@ -704,12 +756,12 @@ function debounce(fn, delay) {
 }
 
 function escapeHtml(str) {
-  const div = document.createElement('div');
+  const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
 }
 
 function formatPrice(price) {
-  if (!price || price <= 0) return '';
+  if (!price || price <= 0) return "";
   return `${price} ${CONFIG.CURRENCY}`;
 }
