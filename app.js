@@ -23,6 +23,8 @@ const CONFIG = {
 let allDishes = [];
 let currentSort = 'recommended';
 let currentQuery = '';
+let currentCategory = 'all';
+let lazyObserver = null;
 
 
 // ----------------------------------------------------------
@@ -33,11 +35,13 @@ document.addEventListener('DOMContentLoaded', init);
 async function init() {
   initSearch();
   initSort();
+  initCategoryFilter();
   initOfflineDetection();
 
   const dishes = await fetchMenuData();
   if (dishes && dishes.length > 0) {
     allDishes = dishes;
+    buildCategoryFilter(allDishes);
     renderMenu(allDishes);
   }
 }
@@ -59,24 +63,45 @@ async function fetchMenuData() {
 
   const cached = getCachedData();
 
-  // Cache is fresh — use it directly
-  if (cached && isCacheValid()) {
-    return cached.data;
-  }
-
-  // Cache is stale — show it immediately, then try to refresh
+  // Always show cached data first (instant render), then refresh silently
   if (cached) {
     allDishes = cached.data;
     renderMenu(allDishes);
+
+    // If cache is fresh, we're done
+    if (isCacheValid()) return cached.data;
+
+    // Cache is stale — silently refresh in background
+    fetchFresh(cached);
+    return cached.data;
   }
 
-  // Fetch fresh data
+  // No cache — must wait for network (skeletons are visible)
+  return await fetchFresh(null);
+}
+
+async function fetchFresh(cached) {
   try {
     const response = await fetch(CONFIG.SHEET_CSV_URL);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const csvText = await response.text();
     const dishes = parseCSV(csvText);
     setCachedData(dishes);
+
+    // If we already rendered stale cache, only re-render if data changed
+    if (cached) {
+      const changed = JSON.stringify(dishes) !== JSON.stringify(cached.data);
+      if (changed) {
+        allDishes = dishes;
+        buildCategoryFilter(allDishes);
+        renderMenu(allDishes);
+      }
+    } else {
+      // First load (no cache) — render progressively
+      allDishes = dishes;
+      buildCategoryFilter(allDishes);
+      renderMenuProgressive(allDishes);
+    }
     return dishes;
   } catch (error) {
     console.error('Menu fetch failed:', error);
@@ -195,7 +220,7 @@ function renderMenu(dishes) {
   const container = document.getElementById('menu-container');
   container.innerHTML = '';
 
-  let filtered = filterByQuery(dishes, currentQuery);
+  let filtered = filterByCategory(filterByQuery(dishes, currentQuery));
   const grouped = groupByCategory(filtered);
 
   if (grouped.length === 0) {
@@ -215,6 +240,54 @@ function renderMenu(dishes) {
   });
 
   initLazyLoading();
+}
+
+function renderMenuProgressive(dishes) {
+  removeSkeletons();
+
+  const container = document.getElementById('menu-container');
+  container.innerHTML = '';
+
+  const filtered = filterByCategory(filterByQuery(dishes, currentQuery));
+  const grouped = groupByCategory(filtered);
+
+  if (grouped.length === 0) {
+    if (currentQuery) {
+      renderEmptyState(
+        `Nema rezultata za "${escapeHtml(currentQuery)}"`,
+        'Pokusajte sa drugim pojmom za pretragu.'
+      );
+    }
+    return;
+  }
+
+  // Render first category immediately, rest with staggered rAF delays
+  let index = 0;
+
+  function renderNextCategory() {
+    if (index >= grouped.length) {
+      initLazyLoading();
+      return;
+    }
+    const { category, items } = grouped[index];
+    const sorted = sortDishes(items, currentSort);
+    const section = createCategorySection(category, sorted);
+    container.appendChild(section);
+    index++;
+
+    // Lazy-load images for this batch right away
+    section.querySelectorAll('.dish-card__image[data-src]').forEach(img => {
+      if (lazyObserver) lazyObserver.observe(img);
+    });
+
+    if (index < grouped.length) {
+      requestAnimationFrame(renderNextCategory);
+    } else {
+      initLazyLoading();
+    }
+  }
+
+  renderNextCategory();
 }
 
 function groupByCategory(dishes) {
@@ -360,16 +433,19 @@ function createDishCard(dish) {
 function createTagBadge(tag) {
   const badge = document.createElement('span');
   const normalized = tag.toLowerCase().replace(/[^a-z]/g, '');
-  badge.className = `tag-badge tag-badge--${normalized}`;
+  badge.className = 'tag-badge';
 
-  const labels = {
-    new: 'Novo',
-    spicy: 'Ljuto',
-    vegan: 'Vegan',
-    glutenfree: 'Bez glutena',
-  };
+  // Look up config from tags-config.js
+  const config = (typeof TAGS_CONFIG !== 'undefined') && TAGS_CONFIG[normalized];
 
-  badge.textContent = labels[normalized] || tag;
+  if (config) {
+    badge.textContent = config.label || tag;
+    badge.style.background = config.bg;
+    badge.style.color = config.color;
+  } else {
+    badge.textContent = tag;
+  }
+
   return badge;
 }
 
@@ -430,7 +506,7 @@ function initSearch() {
 }
 
 function filterByQuery(dishes, query) {
-  if (!query) return dishes;
+  if (!query || query.length < 3) return dishes;
   const normalized = normalizeText(query);
   return dishes.filter(dish => {
     return (
@@ -451,7 +527,68 @@ function normalizeText(str) {
 
 
 // ----------------------------------------------------------
-// 8. SORT
+// 8. CATEGORY FILTER
+// ----------------------------------------------------------
+function initCategoryFilter() {
+  const container = document.getElementById('category-filter');
+  container.addEventListener('click', (e) => {
+    const pill = e.target.closest('.category-pill');
+    if (!pill) return;
+
+    const cat = pill.dataset.category;
+    if (cat === currentCategory) return;
+
+    currentCategory = cat;
+    container.querySelectorAll('.category-pill').forEach(p =>
+      p.classList.remove('category-pill--active')
+    );
+    pill.classList.add('category-pill--active');
+
+    if (allDishes.length > 0) renderMenu(allDishes);
+  });
+}
+
+function buildCategoryFilter(dishes) {
+  const container = document.getElementById('category-filter');
+
+  // Get distinct categories in sheet order
+  const categories = [];
+  dishes.forEach(d => {
+    if (d.category && !categories.includes(d.category)) {
+      categories.push(d.category);
+    }
+  });
+
+  // Clear existing pills (except "Sve")
+  container.innerHTML = '';
+
+  // "All" pill
+  const allPill = document.createElement('button');
+  allPill.className = 'category-pill category-pill--active';
+  allPill.dataset.category = 'all';
+  allPill.textContent = 'Sve';
+  container.appendChild(allPill);
+
+  // One pill per category
+  categories.forEach(cat => {
+    const pill = document.createElement('button');
+    pill.className = 'category-pill';
+    pill.dataset.category = cat;
+    pill.textContent = cat;
+    container.appendChild(pill);
+  });
+
+  container.hidden = false;
+}
+
+function filterByCategory(dishes) {
+  if (currentCategory === 'all') return dishes;
+  return dishes.filter(d => d.category === currentCategory);
+}
+
+
+// ----------------------------------------------------------
+// 9. SORT
 // ----------------------------------------------------------
 function initSort() {
   const buttons = document.querySelectorAll('.sort-btn');
@@ -476,11 +613,14 @@ function initSort() {
 function initLazyLoading() {
   const images = document.querySelectorAll('.dish-card__image[data-src]');
   if ('IntersectionObserver' in window) {
-    const observer = new IntersectionObserver(onImageIntersect, {
-      rootMargin: '200px 0px',
-      threshold: 0.01,
-    });
-    images.forEach(img => observer.observe(img));
+    // Reuse or create observer
+    if (!lazyObserver) {
+      lazyObserver = new IntersectionObserver(onImageIntersect, {
+        rootMargin: '200px 0px',
+        threshold: 0.01,
+      });
+    }
+    images.forEach(img => lazyObserver.observe(img));
   } else {
     // Fallback: load all images immediately
     images.forEach(img => {

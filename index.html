@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="sr">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,13 +14,21 @@
 
   <title>Libero — Meni</title>
 
+  <link rel="icon" type="image/png" href="/assets/favicon/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon/favicon.svg" />
+  <link rel="shortcut icon" href="/assets/favicon/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicon/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Libero Meni" />
+  <link rel="manifest" href="/assets/favicon/site.webmanifest" />
   <!-- Preconnect -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
   <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Playfair+Display:wght@700&display=swap"
+    rel="stylesheet">
 
   <!-- Styles -->
   <link rel="stylesheet" href="style.css">
@@ -27,14 +36,19 @@
   <!-- PapaParse -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" defer></script>
 
+  <!-- Tags Config (edit colors/labels here) -->
+  <script src="tags-config.js" defer></script>
+
   <!-- App -->
   <script src="app.js" defer></script>
 </head>
+
 <body>
 
   <!-- Offline Badge -->
   <div id="offline-badge" class="offline-badge" hidden>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
       <line x1="1" y1="1" x2="23" y2="23"></line>
       <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
       <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
@@ -51,31 +65,45 @@
     <div class="header__brand">
       <img src="assets/images/LogoLibero.svg" alt="Libero" class="header__logo" width="120" height="50">
     </div>
-    <button class="header__search-toggle" id="search-toggle" aria-label="Pretrazi meni">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"></circle>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-      </svg>
-    </button>
+    <div class="header__actions">
+      <a href="tel:+381693336303" class="header__action-btn" aria-label="Pozovite nas">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path
+            d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z">
+          </path>
+        </svg>
+      </a>
+      <a href="https://www.google.com/maps/place/Libero+Fast+Food/@43.902285,22.27958,20.71z" target="_blank" rel="noopener noreferrer" class="header__action-btn" aria-label="Lokacija na mapi">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+          <circle cx="12" cy="10" r="3"></circle>
+        </svg>
+      </a>
+      <button class="header__action-btn" id="search-toggle" aria-label="Pretrazi meni">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </button>
+    </div>
   </header>
 
   <!-- Search Bar -->
   <div class="search-container" id="search-container" hidden>
     <div class="search-bar">
-      <svg class="search-bar__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg class="search-bar__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8"></circle>
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
       </svg>
-      <input
-        type="search"
-        id="search-input"
-        class="search-bar__input"
-        placeholder="Pretrazi jela ili sastojke..."
-        autocomplete="off"
-        aria-label="Pretrazi meni"
-      >
+      <input type="search" id="search-input" class="search-bar__input" placeholder="Pretrazi jela ili sastojke..."
+        autocomplete="off" aria-label="Pretrazi meni">
       <button class="search-bar__clear" id="search-clear" hidden aria-label="Obrisi pretragu">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18"></line>
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
@@ -83,9 +111,14 @@
     </div>
   </div>
 
+  <!-- Category Filter (populated dynamically by JS) -->
+  <div class="category-filter" id="category-filter" hidden>
+    <button class="category-pill category-pill--active" data-category="all">Sve</button>
+  </div>
+
   <!-- Sort Controls -->
   <div class="sort-bar">
-    <button class="sort-btn sort-btn--active" data-sort="recommended">Preporuceno</button>
+    <button class="sort-btn sort-btn--active" data-sort="recommended">Preporučeno</button>
     <button class="sort-btn" data-sort="price-asc">Cena ↑</button>
     <button class="sort-btn" data-sort="price-desc">Cena ↓</button>
   </div>
@@ -144,4 +177,5 @@
   </footer>
 
 </body>
+
 </html>
