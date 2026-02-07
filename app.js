@@ -14,6 +14,8 @@ const CONFIG = {
   IMAGE_BASE_PATH: 'assets/images/',
   PLACEHOLDER_IMAGE: 'assets/images/placeholder.svg',
   CURRENCY: 'RSD',
+  PHONE_NUMBER: '+381693336303',
+  MAPS_URL: 'https://www.google.com/maps/place/Libero+Fast+Food/@43.902285,22.27958,20z/data=!4m6!3m5!1s0x475473005fce1ab9:0x5deb13694bb3f3f9!8m2!3d43.9021943!4d22.2796925!16s%2Fg%2F11xvbp01kn?entry=ttu&g_ep=EgoyMDI2MDIwNC4wIKXMDSoASAFQAw%3D%3D',
 };
 
 
@@ -33,6 +35,7 @@ let lazyObserver = null;
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
+  initHeaderLinks();
   initSearch();
   initSort();
   initCategoryFilter();
@@ -43,6 +46,17 @@ async function init() {
     allDishes = dishes;
     buildCategoryFilter(allDishes);
     renderMenu(allDishes);
+  }
+}
+
+function initHeaderLinks() {
+  const phoneLink = document.getElementById('phone-link');
+  const mapsLink = document.getElementById('maps-link');
+  if (phoneLink && CONFIG.PHONE_NUMBER) {
+    phoneLink.href = `tel:${CONFIG.PHONE_NUMBER}`;
+  }
+  if (mapsLink && CONFIG.MAPS_URL) {
+    mapsLink.href = CONFIG.MAPS_URL;
   }
 }
 
@@ -530,26 +544,15 @@ function normalizeText(str) {
 // 8. CATEGORY FILTER
 // ----------------------------------------------------------
 function initCategoryFilter() {
-  const container = document.getElementById('category-filter');
-  container.addEventListener('click', (e) => {
-    const pill = e.target.closest('.category-pill');
-    if (!pill) return;
-
-    const cat = pill.dataset.category;
-    if (cat === currentCategory) return;
-
-    currentCategory = cat;
-    container.querySelectorAll('.category-pill').forEach(p =>
-      p.classList.remove('category-pill--active')
-    );
-    pill.classList.add('category-pill--active');
-
+  const select = document.getElementById('category-select');
+  select.addEventListener('change', () => {
+    currentCategory = select.value;
     if (allDishes.length > 0) renderMenu(allDishes);
   });
 }
 
 function buildCategoryFilter(dishes) {
-  const container = document.getElementById('category-filter');
+  const select = document.getElementById('category-select');
 
   // Get distinct categories in sheet order
   const categories = [];
@@ -559,26 +562,31 @@ function buildCategoryFilter(dishes) {
     }
   });
 
-  // Clear existing pills (except "Sve")
-  container.innerHTML = '';
+  // Preserve current selection if it still exists
+  const previousValue = currentCategory;
 
-  // "All" pill
-  const allPill = document.createElement('button');
-  allPill.className = 'category-pill category-pill--active';
-  allPill.dataset.category = 'all';
-  allPill.textContent = 'Sve';
-  container.appendChild(allPill);
+  // Rebuild options
+  select.innerHTML = '';
 
-  // One pill per category
+  const allOption = document.createElement('option');
+  allOption.value = 'all';
+  allOption.textContent = 'Sve kategorije';
+  select.appendChild(allOption);
+
   categories.forEach(cat => {
-    const pill = document.createElement('button');
-    pill.className = 'category-pill';
-    pill.dataset.category = cat;
-    pill.textContent = cat;
-    container.appendChild(pill);
+    const option = document.createElement('option');
+    option.value = cat;
+    option.textContent = cat;
+    select.appendChild(option);
   });
 
-  container.hidden = false;
+  // Restore selection
+  if (categories.includes(previousValue) || previousValue === 'all') {
+    select.value = previousValue;
+  } else {
+    select.value = 'all';
+    currentCategory = 'all';
+  }
 }
 
 function filterByCategory(dishes) {

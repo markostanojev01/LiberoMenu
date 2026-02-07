@@ -17,6 +17,16 @@ const TAGS_CONFIG = {
     bg: '#FFCF40',
     color: '#1A1A1A',
   },
+  preporuka: {
+    label: 'Preporuka',
+    bg: '#FFCF40',
+    color: '#1A1A1A',
+  },
+  popularno: {
+    label: 'Popularno',
+    bg: '#FFCF40',
+    color: '#1A1A1A',
+  },
   spicy: {
     label: 'Ljuto',
     bg: '#FEE2E2',

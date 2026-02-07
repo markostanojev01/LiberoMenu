@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#FFCF40">
   <meta name="description" content="Libero — Pogledajte nas meni. Brza hrana i jela po vasem ukusu.">
 
@@ -66,7 +66,7 @@
       <img src="assets/images/LogoLibero.svg" alt="Libero" class="header__logo" width="120" height="50">
     </div>
     <div class="header__actions">
-      <a href="tel:+381693336303" class="header__action-btn" aria-label="Pozovite nas">
+      <a id="phone-link" href="#" class="header__action-btn" aria-label="Pozovite nas">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
           stroke-linecap="round" stroke-linejoin="round">
           <path
@@ -74,7 +74,8 @@
           </path>
         </svg>
       </a>
-      <a href="https://www.google.com/maps/place/Libero+Fast+Food/@43.902285,22.27958,20.71z" target="_blank" rel="noopener noreferrer" class="header__action-btn" aria-label="Lokacija na mapi">
+      <a id="maps-link" href="#" target="_blank" rel="noopener noreferrer" class="header__action-btn"
+        aria-label="Lokacija na mapi">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
@@ -111,16 +112,14 @@
     </div>
   </div>
 
-  <!-- Category Filter (populated dynamically by JS) -->
-  <div class="category-filter" id="category-filter" hidden>
-    <button class="category-pill category-pill--active" data-category="all">Sve</button>
-  </div>
-
-  <!-- Sort Controls -->
-  <div class="sort-bar">
-    <button class="sort-btn sort-btn--active" data-sort="recommended">Preporučeno</button>
+  <!-- Filters Bar -->
+  <div class="filters-bar">
+    <button class="sort-btn sort-btn--active" data-sort="recommended">Sve</button>
     <button class="sort-btn" data-sort="price-asc">Cena ↑</button>
     <button class="sort-btn" data-sort="price-desc">Cena ↓</button>
+    <select class="category-select" id="category-select" aria-label="Filtriraj po kategoriji">
+      <option value="all">Sve kategorije</option>
+    </select>
   </div>
 
   <!-- Menu Content -->
