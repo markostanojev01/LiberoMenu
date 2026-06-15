@@ -6,18 +6,26 @@
 // 1. CONFIGURATION
 // ----------------------------------------------------------
 const CONFIG = {
-  // Replace with your published Google Sheet CSV URL
+  // Food sheet — existing endpoint
   SHEET_CSV_URL:
     "https://script.google.com/macros/s/AKfycbyjuDHlU4XfkdfIZXBqk7XTHHnVa4WhvoNlnGBt-oaFo97UXsknKqOjTW94No3IFfzP/exec",
-  CACHE_KEY: "libero_menu_data",
-  CACHE_TIMESTAMP_KEY: "libero_menu_ts",
-  CACHE_TTL: 5 * 60 * 1000, // 5 minutes
+  // Drinks sheet — set this once the second Apps Script is deployed
+  SHEET_CSV_URL_DRINKS:
+    "https://script.google.com/macros/s/AKfycbxDPOqgA1rM0Esr-fPDfr62JfLXYeU7WvaA6JmXt_y8xYNslQxU2vodtflrJ-8IjBhEFg/exec",
+  CACHE_KEY_FOOD: "libero_menu_data",         // preserves existing cached data
+  CACHE_TS_FOOD: "libero_menu_ts",
+  CACHE_KEY_DRINKS: "libero_drinks_data",
+  CACHE_TS_DRINKS: "libero_drinks_ts",
+  CACHE_TTL: 5 * 60 * 1000,
   IMAGE_BASE_PATH: "assets/images/",
   PLACEHOLDER_IMAGE: "assets/images/placeholder.svg",
   CURRENCY: "RSD",
   PHONE_NUMBER: "+381693336303",
   MAPS_URL:
     "https://www.google.com/maps/place/Libero+Fast+Food/@43.902285,22.27958,20z/data=!4m6!3m5!1s0x475473005fce1ab9:0x5deb13694bb3f3f9!8m2!3d43.9021943!4d22.2796925!16s%2Fg%2F11xvbp01kn?entry=ttu&g_ep=EgoyMDI2MDIwNC4wIKXMDSoASAFQAw%3D%3D",
+  PHONE_NUMBER_DRINKS: "019290349",
+  MAPS_URL_DRINKS:
+    "https://www.google.com/maps/place/Caffe+Libero/@43.9023973,22.2790735,128m/data=!3m1!1e3!4m6!3m5!1s0x475473b69a96bffd:0x58ffa77267108121!8m2!3d43.9023373!4d22.2795993!16s%2Fg%2F11rnk0dgbk?entry=ttu&g_ep=EgoyMDI2MDYxMC4wIKXMDSoASAFQAw%3D%3D",
 };
 
 /** Pica (pizza) size order; price format from sheet is "1200/1500/2000" → S/M/XL. Non-numeric segment = size not available. */
@@ -42,11 +50,19 @@ function parsePicaPrice(val) {
 // ----------------------------------------------------------
 // 2. STATE
 // ----------------------------------------------------------
-let allDishes = [];
+let foodDishes = [];
+let drinkDishes = [];
+let currentDepartment = null; // null = landing screen visible
 let currentSort = "recommended";
 let currentQuery = "";
 let currentCategory = "all";
 let lazyObserver = null;
+
+function getActiveDishes() {
+  if (currentDepartment === "drinks") return drinkDishes;
+  if (currentDepartment === "food") return foodDishes;
+  return [];
+}
 
 // ----------------------------------------------------------
 // 3. INITIALIZATION
@@ -54,135 +70,237 @@ let lazyObserver = null;
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  initHeaderLinks();
+  updateHeaderLinks("food");
   initSearch();
   initSort();
   initCategoryFilter();
   initOfflineDetection();
+  initLanding();
+  initDeptToggle();
   if (typeof initCart === "function") initCart();
 
-  const dishes = await fetchMenuData();
-  if (dishes && dishes.length > 0) {
-    allDishes = dishes;
-    buildCategoryFilter(allDishes);
-    renderMenu(allDishes);
+  document.body.classList.add("view-landing");
+
+  await fetchMenuData();
+}
+
+function updateHeaderLinks(dep) {
+  const phoneLink = document.getElementById("phone-link");
+  const mapsLink = document.getElementById("maps-link");
+  const phone = dep === "drinks" ? CONFIG.PHONE_NUMBER_DRINKS : CONFIG.PHONE_NUMBER;
+  const maps = dep === "drinks" ? CONFIG.MAPS_URL_DRINKS : CONFIG.MAPS_URL;
+  if (phoneLink && phone) phoneLink.href = `tel:${phone}`;
+  if (mapsLink && maps) mapsLink.href = maps;
+}
+
+function setDepartment(dep) {
+  currentDepartment = dep;
+
+  document.body.classList.toggle("view-landing", dep === null);
+  document.body.classList.toggle("view-food", dep === "food");
+  document.body.classList.toggle("view-drinks", dep === "drinks");
+
+  updateHeaderLinks(dep);
+
+  // Reset filters/search/sort whenever the department changes
+  currentQuery = "";
+  currentCategory = "all";
+  currentSort = "recommended";
+
+  const searchContainer = document.getElementById("search-container");
+  const searchInput = document.getElementById("search-input");
+  const searchClear = document.getElementById("search-clear");
+  if (searchContainer) searchContainer.hidden = true;
+  if (searchInput) searchInput.value = "";
+  if (searchClear) searchClear.hidden = true;
+
+  // Sync sort buttons to default
+  document.querySelectorAll(".sort-btn").forEach((btn) => {
+    btn.classList.toggle("sort-btn--active", btn.dataset.sort === "recommended");
+  });
+
+  // Sync dept toggle visual + a11y state
+  document.querySelectorAll(".dept-toggle__btn").forEach((btn) => {
+    const isActive = btn.dataset.dep === dep;
+    btn.classList.toggle("dept-toggle__btn--active", isActive);
+    btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+
+  if (dep !== null) {
+    const dishes = getActiveDishes();
+    buildCategoryFilter(dishes);
+    if (dishes.length > 0) {
+      renderMenu(dishes);
+    } else {
+      removeSkeletons();
+      renderEmptyState(
+        dep === "drinks" ? "Piće uskoro" : "Meni jos nije dostupan",
+        dep === "drinks"
+          ? "Lista pića će biti dostupna uskoro."
+          : "Proverite internet konekciju i pokusajte ponovo.",
+      );
+    }
+    window.scrollTo({ top: 0 });
   }
 }
 
-function initHeaderLinks() {
-  const phoneLink = document.getElementById("phone-link");
-  const mapsLink = document.getElementById("maps-link");
-  if (phoneLink && CONFIG.PHONE_NUMBER) {
-    phoneLink.href = `tel:${CONFIG.PHONE_NUMBER}`;
-  }
-  if (mapsLink && CONFIG.MAPS_URL) {
-    mapsLink.href = CONFIG.MAPS_URL;
-  }
+function initLanding() {
+  document.querySelectorAll(".landing__panel").forEach((panel) => {
+    panel.addEventListener("click", () => {
+      setDepartment(panel.dataset.dep);
+    });
+  });
+}
+
+function initDeptToggle() {
+  document.querySelectorAll(".dept-toggle__btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const dep = btn.dataset.dep;
+      if (dep === currentDepartment) return;
+      setDepartment(dep);
+    });
+  });
 }
 
 // ----------------------------------------------------------
 // 4. DATA FETCHING & CACHING
 // ----------------------------------------------------------
 async function fetchMenuData() {
-  // If no Sheet URL configured, show a setup message
-  if (!CONFIG.SHEET_CSV_URL) {
-    removeSkeletons();
-    renderEmptyState(
-      "Meni jos nije povezan",
-      "Dodajte Google Sheet CSV URL u app.js konfiguraciju.",
-    );
-    return [];
-  }
-
-  const cached = getCachedData();
-
-  // Always show cached data first (instant render), then refresh silently
-  if (cached) {
-    allDishes = cached.data;
-    renderMenu(allDishes);
-
-    // If cache is fresh, we're done
-    if (isCacheValid()) return cached.data;
-
-    // Cache is stale — silently refresh in background
-    fetchFresh(cached);
-    return cached.data;
-  }
-
-  // No cache — must wait for network (skeletons are visible)
-  return await fetchFresh(null);
+  // Fire both fetches in parallel. Each one independently updates its
+  // department array and triggers a render if it's the active department.
+  await Promise.all([
+    fetchDepartment("food"),
+    fetchDepartment("drinks"),
+  ]);
 }
 
-async function fetchFresh(cached) {
+async function fetchDepartment(dep) {
+  const { url, cacheKey, tsKey, parser } = getDepartmentConfig(dep);
+
+  // No URL configured — render empty state only if this is the active dept
+  if (!url) {
+    if (dep === "food" && currentDepartment === "food") {
+      removeSkeletons();
+      renderEmptyState(
+        "Meni jos nije povezan",
+        "Dodajte Google Sheet CSV URL u app.js konfiguraciju.",
+      );
+    }
+    setDepartmentData(dep, []);
+    return;
+  }
+
+  const cached = getCachedData(cacheKey, tsKey);
+
+  if (cached) {
+    applyDepartmentData(dep, cached.data);
+    if (isCacheValid(tsKey)) return;
+    // Stale — refresh in background
+    fetchFresh(dep, cached);
+    return;
+  }
+
+  // No cache — wait for network
+  await fetchFresh(dep, null);
+}
+
+async function fetchFresh(dep, cached) {
+  const { url, parser, cacheKey, tsKey } = getDepartmentConfig(dep);
   try {
-    const response = await fetch(CONFIG.SHEET_CSV_URL);
+    const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const csvText = await response.text();
-    const dishes = parseCSV(csvText);
-    setCachedData(dishes);
+    const dishes = parser(csvText);
+    setCachedData(cacheKey, tsKey, dishes);
 
-    // If we already rendered stale cache, only re-render if data changed
     if (cached) {
       const changed = JSON.stringify(dishes) !== JSON.stringify(cached.data);
       if (changed) {
-        allDishes = dishes;
-        buildCategoryFilter(allDishes);
-        renderMenu(allDishes);
+        applyDepartmentData(dep, dishes);
       }
     } else {
-      // First load (no cache) — render progressively
-      allDishes = dishes;
-      buildCategoryFilter(allDishes);
-      renderMenuProgressive(allDishes);
+      applyDepartmentData(dep, dishes, { progressive: true });
     }
-    return dishes;
   } catch (error) {
-    console.error("Menu fetch failed:", error);
-
+    console.error(`Menu fetch failed (${dep}):`, error);
     if (cached) {
       renderOfflineBadge(true);
-      return cached.data;
+      return;
     }
-
-    removeSkeletons();
-    renderEmptyState(
-      "Meni trenutno nije dostupan",
-      "Proverite internet konekciju i pokusajte ponovo.",
-    );
-    return [];
+    if (dep === "food" && currentDepartment === "food") {
+      removeSkeletons();
+      renderEmptyState(
+        "Meni trenutno nije dostupan",
+        "Proverite internet konekciju i pokusajte ponovo.",
+      );
+    }
   }
 }
 
-function getCachedData() {
+function setDepartmentData(dep, dishes) {
+  if (dep === "food") foodDishes = dishes;
+  else drinkDishes = dishes;
+}
+
+function applyDepartmentData(dep, dishes, { progressive = false } = {}) {
+  setDepartmentData(dep, dishes);
+  if (currentDepartment !== dep) return;
+  const active = getActiveDishes();
+  buildCategoryFilter(active);
+  if (progressive) {
+    renderMenuProgressive(active);
+  } else {
+    renderMenu(active);
+  }
+}
+
+function getDepartmentConfig(dep) {
+  if (dep === "food") {
+    return {
+      url: CONFIG.SHEET_CSV_URL,
+      cacheKey: CONFIG.CACHE_KEY_FOOD,
+      tsKey: CONFIG.CACHE_TS_FOOD,
+      parser: parseFoodCSV,
+    };
+  }
+  return {
+    url: CONFIG.SHEET_CSV_URL_DRINKS,
+    cacheKey: CONFIG.CACHE_KEY_DRINKS,
+    tsKey: CONFIG.CACHE_TS_DRINKS,
+    parser: parseDrinksCSV,
+  };
+}
+
+function getCachedData(cacheKey, tsKey) {
   try {
-    const raw = localStorage.getItem(CONFIG.CACHE_KEY);
-    const ts = localStorage.getItem(CONFIG.CACHE_TIMESTAMP_KEY);
+    const raw = localStorage.getItem(cacheKey);
+    const ts = localStorage.getItem(tsKey);
     if (!raw || !ts) return null;
-    return { data: JSON.parse(raw), timestamp: parseInt(ts, 10) };
+    return { data: JSON.parse(raw) };
   } catch {
     return null;
   }
 }
 
-function setCachedData(dishes) {
+function setCachedData(cacheKey, tsKey, dishes) {
   try {
-    localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify(dishes));
-    localStorage.setItem(CONFIG.CACHE_TIMESTAMP_KEY, String(Date.now()));
+    localStorage.setItem(cacheKey, JSON.stringify(dishes));
+    localStorage.setItem(tsKey, String(Date.now()));
   } catch {
     // localStorage full or unavailable — fail silently
   }
 }
 
-function isCacheValid() {
-  const cached = getCachedData();
-  if (!cached) return false;
-  return Date.now() - cached.timestamp < CONFIG.CACHE_TTL;
+function isCacheValid(tsKey) {
+  const ts = localStorage.getItem(tsKey);
+  if (!ts) return false;
+  return Date.now() - parseInt(ts, 10) < CONFIG.CACHE_TTL;
 }
 
 // ----------------------------------------------------------
 // 5. CSV PARSING
 // ----------------------------------------------------------
-function parseCSV(csvString) {
+function parseFoodCSV(csvString) {
   const result = Papa.parse(csvString, {
     header: true,
     skipEmptyLines: true,
@@ -218,6 +336,7 @@ function transformRow(row) {
   }
 
   return {
+    department: "food",
     category,
     sortOrder: Number(row.SortOrder) || 0,
     name: String(row.Name || "").trim(),
@@ -227,6 +346,49 @@ function transformRow(row) {
     price,
     variants,
     imageUrl: String(row.ImageUrl || "").trim(),
+    tags: parseTags(row.Tags),
+  };
+}
+
+function parseDrinksCSV(csvString) {
+  const result = Papa.parse(csvString, {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: true,
+    transformHeader: (h) => h.trim(),
+  });
+
+  if (result.errors.length > 0) {
+    console.warn("Drinks CSV parse warnings:", result.errors);
+  }
+
+  return result.data
+    .filter((row) => {
+      const active = row.Active;
+      return active === true || active === "TRUE" || active === "true";
+    })
+    .map(transformDrinkRow);
+}
+
+function parsePriceCell(val) {
+  if (val == null || val === "") return 0;
+  if (typeof val === "number") return val;
+  const match = String(val).match(/[\d.]+/);
+  return match ? Number(match[0]) : 0;
+}
+
+function transformDrinkRow(row) {
+  return {
+    department: "drinks",
+    category: String(row.Category || "").trim(),
+    sortOrder: Number(row.SortOrder) || 0,
+    name: String(row.Name || "").trim(),
+    description: "",
+    ingredients: "",
+    allergens: "",
+    imageUrl: "",
+    price: parsePriceCell(row.Price),
+    variants: parseVariants(row.Variants),
     tags: parseTags(row.Tags),
   };
 }
@@ -388,9 +550,14 @@ function createCategorySection(category, dishes) {
   section.appendChild(header);
 
   dishes.forEach((dish) => {
-    const card = createDishCard(dish);
-    if (typeof makeDishCardTappable === "function") {
-      makeDishCardTappable(card, dish);
+    let card;
+    if (dish.department === "drinks") {
+      card = createDrinkCard(dish);
+    } else {
+      card = createDishCard(dish);
+      if (typeof makeDishCardTappable === "function") {
+        makeDishCardTappable(card, dish);
+      }
     }
     section.appendChild(card);
   });
@@ -497,6 +664,75 @@ function createDishCard(dish) {
   return card;
 }
 
+function createDrinkCard(dish) {
+  const card = document.createElement("article");
+  card.className = "drink-card";
+
+  const body = document.createElement("div");
+  body.className = "drink-card__body";
+
+  const name = document.createElement("h3");
+  name.className = "drink-card__name";
+  name.textContent = dish.name;
+  body.appendChild(name);
+
+  const meta = document.createElement("div");
+  meta.className = "drink-card__meta";
+
+  const priceEl = document.createElement("span");
+  priceEl.className = "drink-card__price";
+  if (dish.variants.length >= 2) {
+    const minPrice = Math.min(...dish.variants.map((v) => v.price));
+    priceEl.textContent = `od ${formatPrice(minPrice)}`;
+  } else if (dish.variants.length === 1) {
+    priceEl.textContent = formatPrice(dish.variants[0].price);
+  } else {
+    priceEl.textContent = formatPrice(dish.price);
+  }
+  meta.appendChild(priceEl);
+
+  if (dish.tags.length > 0) {
+    dish.tags.forEach((tag) => meta.appendChild(createTagBadge(tag)));
+  }
+
+  body.appendChild(meta);
+  card.appendChild(body);
+
+  const addBtn = document.createElement("button");
+  addBtn.className = "drink-card__add";
+  addBtn.type = "button";
+  addBtn.setAttribute("aria-label", `Dodaj ${dish.name}`);
+  addBtn.textContent = "+";
+  addBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (dish.variants.length >= 2) {
+      // Multi-variant — open the existing dish sheet to pick size
+      if (typeof openDishSheet === "function") openDishSheet(dish);
+      return;
+    }
+    addToCart(dish, dish.variants.length === 1 ? 0 : null);
+    flashAdded(addBtn);
+  });
+  card.appendChild(addBtn);
+
+  return card;
+}
+
+function flashAdded(btn) {
+  // Reentrancy-safe: cancel any in-flight restore and capture the resting label only when not mid-flash.
+  if (btn._flashTimer) clearTimeout(btn._flashTimer);
+  if (!btn.classList.contains("drink-card__add--added")) {
+    btn._flashRestore = btn.textContent;
+    btn.classList.add("drink-card__add--added");
+  }
+  btn.textContent = "✓";
+  btn._flashTimer = setTimeout(() => {
+    btn.textContent = btn._flashRestore;
+    btn.classList.remove("drink-card__add--added");
+    btn._flashTimer = null;
+  }, 600);
+}
+
 function createTagBadge(tag) {
   const badge = document.createElement("span");
   const normalized = tag.toLowerCase().replace(/[^a-z]/g, "");
@@ -549,7 +785,7 @@ function initSearch() {
       input.value = "";
       currentQuery = "";
       clearBtn.hidden = true;
-      if (allDishes.length > 0) renderMenu(allDishes);
+      if (getActiveDishes().length > 0) renderMenu(getActiveDishes());
     } else {
       // Opening search
       setTimeout(() => input.focus(), 100);
@@ -561,7 +797,7 @@ function initSearch() {
     debounce(() => {
       currentQuery = input.value.trim();
       clearBtn.hidden = !currentQuery;
-      if (allDishes.length > 0) renderMenu(allDishes);
+      if (getActiveDishes().length > 0) renderMenu(getActiveDishes());
     }, 300),
   );
 
@@ -569,7 +805,7 @@ function initSearch() {
     input.value = "";
     currentQuery = "";
     clearBtn.hidden = true;
-    if (allDishes.length > 0) renderMenu(allDishes);
+    if (getActiveDishes().length > 0) renderMenu(getActiveDishes());
     input.focus();
   });
 }
@@ -601,7 +837,7 @@ function initCategoryFilter() {
   const select = document.getElementById("category-select");
   select.addEventListener("change", () => {
     currentCategory = select.value;
-    if (allDishes.length > 0) renderMenu(allDishes);
+    if (getActiveDishes().length > 0) renderMenu(getActiveDishes());
   });
 }
 
@@ -662,7 +898,7 @@ function initSort() {
       buttons.forEach((b) => b.classList.remove("sort-btn--active"));
       btn.classList.add("sort-btn--active");
 
-      if (allDishes.length > 0) renderMenu(allDishes);
+      if (getActiveDishes().length > 0) renderMenu(getActiveDishes());
     });
   });
 }
@@ -724,13 +960,8 @@ function initOfflineDetection() {
 
 function handleOnline() {
   renderOfflineBadge(false);
-  // Attempt a background refresh
-  fetchMenuData().then((dishes) => {
-    if (dishes && dishes.length > 0) {
-      allDishes = dishes;
-      renderMenu(allDishes);
-    }
-  });
+  // Attempt a background refresh — fetchMenuData re-renders internally if data changed
+  fetchMenuData();
 }
 
 function handleOffline() {

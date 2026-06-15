@@ -189,6 +189,11 @@ a {
   display: block;
 }
 
+/* Per-department logo swap (driven by body class) */
+.header__logo--drinks { display: none; }
+.view-drinks .header__logo--food { display: none; }
+.view-drinks .header__logo--drinks { display: block; }
+
 .header__actions {
   display: flex;
   align-items: center;
@@ -1416,4 +1421,279 @@ a {
     margin-left: auto;
     margin-right: auto;
   }
+}
+
+/* ----------------------------------------------------------
+   23. LANDING SCREEN (PIĆE / HRANA picker)
+   ---------------------------------------------------------- */
+.landing {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  background: var(--color-bg);
+}
+
+@media (orientation: landscape) and (min-width: 600px) {
+  .landing {
+    grid-template-rows: none;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.landing__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  border: none;
+  cursor: pointer;
+  transition: transform 150ms var(--ease-out), filter 150ms var(--ease-out);
+  padding: var(--space-xl);
+}
+
+.landing__panel:active {
+  transform: scale(0.97);
+  filter: brightness(1.05);
+}
+
+.landing__panel--food {
+  background: var(--color-text);
+  color: var(--color-primary);
+}
+
+.landing__panel--drinks {
+  background: var(--color-primary);
+  color: var(--color-text);
+}
+
+.landing__panel:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 4px var(--color-text);
+}
+
+.landing__panel--food:focus-visible {
+  box-shadow: inset 0 0 0 4px var(--color-primary);
+}
+
+.landing__panel--drinks:focus-visible {
+  box-shadow: inset 0 0 0 4px var(--color-text);
+}
+
+.landing__logo {
+  max-width: min(70%, 320px);
+  max-height: 28vh;
+  width: auto;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.landing__panel--drinks .landing__logo {
+  filter: brightness(0);
+}
+
+.landing__label {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 9vw, 64px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Visibility rules — show landing only when no department picked */
+.view-landing .header,
+.view-landing .dept-bar,
+.view-landing .search-container,
+.view-landing .filters-bar,
+.view-landing .menu-container,
+.view-landing .footer,
+.view-landing #cart-fab,
+.view-landing #offline-badge { display: none !important; }
+
+body:not(.view-landing) #landing { display: none; }
+
+
+/* ----------------------------------------------------------
+   24. DEPARTMENT TOGGLE (sticky bar under header)
+   ---------------------------------------------------------- */
+.dept-bar {
+  position: sticky;
+  top: var(--header-height);
+  z-index: var(--z-header);
+  max-width: 520px;
+  margin: 0 auto;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dept-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: transparent;
+}
+
+.dept-toggle__btn {
+  padding: 10px 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary-dark);
+  background: transparent;
+  min-height: 44px;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.dept-toggle__btn:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-text);
+}
+
+.dept-toggle__btn--active {
+  background: var(--color-primary);
+  color: var(--color-text);
+}
+
+.dept-toggle__btn--active:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--color-text);
+}
+
+.dept-toggle__btn:not(.dept-toggle__btn--active):hover {
+  background: var(--color-primary-light);
+}
+
+/* Drinks view: switch toggle accent from gold to teal — sub-brand cue */
+.view-drinks .dept-toggle {
+  border-color: #0F766E;
+}
+.view-drinks .dept-toggle__btn {
+  color: #0F766E;
+}
+.view-drinks .dept-toggle__btn--active {
+  background: #115E59;
+  color: #FFFFFF;
+}
+.view-drinks .dept-toggle__btn:not(.dept-toggle__btn--active):hover {
+  background: #CCFBF1;
+}
+
+/* ----------------------------------------------------------
+   25. DRINK CARD
+   ---------------------------------------------------------- */
+.drink-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.drink-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.drink-card__name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.drink-card__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.drink-card__price {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--color-primary-dark);
+}
+
+.drink-card__add {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-text);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 150ms var(--ease-out), background 150ms var(--ease-out);
+}
+
+.drink-card__add:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-text);
+}
+
+.drink-card__add:active {
+  transform: scale(0.92);
+}
+
+.drink-card__add--added {
+  background: #10B981; /* success green */
+  color: #fff;
+}
+
+/* ----------------------------------------------------------
+   26. CART GROUP HEADERS (HRANA / PIĆE)
+   ---------------------------------------------------------- */
+.cart-group {
+  margin-bottom: var(--space-md);
+}
+
+.cart-group__header {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  padding: var(--space-xs) 0;
+  border-bottom: 2px solid var(--color-primary);
+  margin-bottom: var(--space-sm);
+}
+
+/* ----------------------------------------------------------
+   27. WAITER SUMMARY GROUP HEADERS
+   ---------------------------------------------------------- */
+.waiter-summary__group-header {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-primary-dark);
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-xs);
+  border-bottom: 2px solid var(--color-primary-dark);
+}
+
+.waiter-summary__group-header:first-child {
+  margin-top: 0;
 }

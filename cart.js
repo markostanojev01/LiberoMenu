@@ -11,7 +11,23 @@ let cart = loadCart();
 function loadCart() {
   try {
     const raw = localStorage.getItem(CART_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const items = JSON.parse(raw);
+    let mutated = false;
+    items.forEach((item) => {
+      if (!item.department) {
+        item.department = "food";
+        mutated = true;
+      }
+    });
+    if (mutated) {
+      try {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+      } catch {
+        // Write failed (quota/private mode). Keep the in-memory cart anyway.
+      }
+    }
+    return items;
   } catch {
     return [];
   }
@@ -35,6 +51,7 @@ function addToCart(dish, variantIndex) {
   } else {
     cart.push({
       key,
+      department: dish.department || "food", // defensive default — every dish is tagged in the data layer
       name: dish.name,
       variant: variant ? variant.label : null,
       price: variant ? variant.price : dish.price,
@@ -198,12 +215,17 @@ function openDishSheet(dish) {
     ingredientsHtml = `<p class="sheet-dish__ingredients"><strong>Sastojci:</strong> ${escapeHtml(dish.ingredients)}</p>`;
   }
 
+  const imageBlock =
+    dish.department === "drinks"
+      ? ""
+      : `<div class="sheet-dish__image-wrap">
+           <img class="sheet-dish__image" src="${imgSrc}" alt="${escapeHtml(dish.name)}"
+             onerror="this.src='${CONFIG.PLACEHOLDER_IMAGE}'">
+         </div>`;
+
   content.innerHTML = `
     <div class="sheet-dish">
-      <div class="sheet-dish__image-wrap">
-        <img class="sheet-dish__image" src="${imgSrc}" alt="${escapeHtml(dish.name)}"
-          onerror="this.src='${CONFIG.PLACEHOLDER_IMAGE}'">
-      </div>
+      ${imageBlock}
       <h2 class="sheet-dish__name">${escapeHtml(dish.name)}</h2>
       ${tagsHtml}
       ${dish.description ? `<p class="sheet-dish__description">${escapeHtml(dish.description)}</p>` : ""}
@@ -298,28 +320,42 @@ function openCartSheet() {
       </div>
     `;
   } else {
+    const foodItems = cart.filter((i) => i.department === "food");
+    const drinkItems = cart.filter((i) => i.department === "drinks");
+
+    const renderGroup = (label, items) => {
+      if (items.length === 0) return "";
+      return `
+        <div class="cart-group">
+          <h3 class="cart-group__header">${label}</h3>
+          <div class="cart-items">
+            ${items
+              .map(
+                (item) => `
+              <div class="cart-item" data-key="${escapeHtml(item.key)}">
+                <div class="cart-item__info">
+                  <span class="cart-item__name">${escapeHtml(item.name)}</span>
+                  ${item.variant ? `<span class="cart-item__variant">${escapeHtml(item.variant)}</span>` : ""}
+                </div>
+                <div class="cart-item__controls">
+                  <button class="cart-item__qty-btn" data-action="minus" aria-label="Smanji">−</button>
+                  <span class="cart-item__qty">${item.qty}</span>
+                  <button class="cart-item__qty-btn" data-action="plus" aria-label="Povećaj">+</button>
+                </div>
+                <span class="cart-item__price">${formatPrice(item.price * item.qty)}</span>
+              </div>
+            `,
+              )
+              .join("")}
+          </div>
+        </div>
+      `;
+    };
+
     content.innerHTML = `
       <h2 class="cart-header">Vaša narudžbina</h2>
-      <div class="cart-items" id="cart-items">
-        ${cart
-          .map(
-            (item) => `
-          <div class="cart-item" data-key="${escapeHtml(item.key)}">
-            <div class="cart-item__info">
-              <span class="cart-item__name">${escapeHtml(item.name)}</span>
-              ${item.variant ? `<span class="cart-item__variant">${escapeHtml(item.variant)}</span>` : ""}
-            </div>
-            <div class="cart-item__controls">
-              <button class="cart-item__qty-btn" data-action="minus" aria-label="Smanji">−</button>
-              <span class="cart-item__qty">${item.qty}</span>
-              <button class="cart-item__qty-btn" data-action="plus" aria-label="Povećaj">+</button>
-            </div>
-            <span class="cart-item__price">${formatPrice(item.price * item.qty)}</span>
-          </div>
-        `,
-          )
-          .join("")}
-      </div>
+      ${renderGroup("HRANA", foodItems)}
+      ${renderGroup("PIĆE", drinkItems)}
       <div class="cart-footer">
         <div class="cart-total">
           <span>Ukupno:</span>
@@ -330,7 +366,7 @@ function openCartSheet() {
       </div>
     `;
 
-    // Bind quantity buttons
+    // Bind quantity buttons (now scoped under .cart-group)
     content.querySelectorAll(".cart-item__qty-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const key = btn.closest(".cart-item").dataset.key;
@@ -340,16 +376,14 @@ function openCartSheet() {
       });
     });
 
-    // Bind waiter button
     document.getElementById("cart-waiter-btn").addEventListener("click", () => {
       closeCartSheet();
       setTimeout(openWaiterSummary, 300);
     });
 
-    // Bind clear button
     document.getElementById("cart-clear-btn").addEventListener("click", () => {
       clearCart();
-      openCartSheet(); // re-render as empty
+      openCartSheet();
     });
   }
 
@@ -379,6 +413,29 @@ function createWaiterSummary() {
 function openWaiterSummary() {
   const screen = document.getElementById("waiter-summary");
 
+  const foodItems = cart.filter((i) => i.department === "food");
+  const drinkItems = cart.filter((i) => i.department === "drinks");
+
+  const renderGroup = (label, items) => {
+    if (items.length === 0) return "";
+    return `
+      <h2 class="waiter-summary__group-header">${label}</h2>
+      ${items
+        .map(
+          (item) => `
+        <div class="waiter-item">
+          <span class="waiter-item__qty">${item.qty}x</span>
+          <span class="waiter-item__name">
+            ${escapeHtml(item.name)}${item.variant ? ` — ${escapeHtml(item.variant)}` : ""}
+          </span>
+          <span class="waiter-item__price">${formatPrice(item.price * item.qty)}</span>
+        </div>
+      `,
+        )
+        .join("")}
+    `;
+  };
+
   screen.innerHTML = `
     <div class="waiter-summary__inner">
       <div class="waiter-summary__header">
@@ -391,19 +448,8 @@ function openWaiterSummary() {
         </button>
       </div>
       <div class="waiter-summary__items">
-        ${cart
-          .map(
-            (item) => `
-          <div class="waiter-item">
-            <span class="waiter-item__qty">${item.qty}x</span>
-            <span class="waiter-item__name">
-              ${escapeHtml(item.name)}${item.variant ? ` — ${escapeHtml(item.variant)}` : ""}
-            </span>
-            <span class="waiter-item__price">${formatPrice(item.price * item.qty)}</span>
-          </div>
-        `,
-          )
-          .join("")}
+        ${renderGroup("HRANA", foodItems)}
+        ${renderGroup("PIĆE", drinkItems)}
       </div>
       <div class="waiter-summary__total">
         <span>Ukupno</span>

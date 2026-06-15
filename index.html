@@ -61,6 +61,18 @@
 
 <body>
 
+  <!-- Landing Screen -->
+  <section id="landing" class="landing" aria-label="Izaberite kategoriju">
+    <button class="landing__panel landing__panel--food" data-dep="food" type="button">
+      <img class="landing__logo" src="assets/images/LogoLibero.svg" alt="" aria-hidden="true">
+      <span class="landing__label">HRANA</span>
+    </button>
+    <button class="landing__panel landing__panel--drinks" data-dep="drinks" type="button">
+      <img class="landing__logo" src="assets/images/LogoLiberoDrinks.svg" alt="" aria-hidden="true">
+      <span class="landing__label">PIĆE</span>
+    </button>
+  </section>
+
   <!-- Offline Badge -->
   <div id="offline-badge" class="offline-badge" hidden>
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -79,7 +91,8 @@
   <!-- Header -->
   <header class="header">
     <div class="header__brand">
-      <img src="assets/images/LogoLibero.svg" alt="Libero" class="header__logo" width="120" height="50">
+      <img src="assets/images/LogoLibero.svg" alt="Libero" class="header__logo header__logo--food" width="120" height="50">
+      <img src="assets/images/LogoLiberoDrinks.svg" alt="Libero Piće" class="header__logo header__logo--drinks" width="56" height="44">
     </div>
     <div class="header__actions">
       <a id="phone-link" href="#" class="header__action-btn" aria-label="Pozovite nas">
@@ -107,6 +120,14 @@
       </button>
     </div>
   </header>
+
+  <!-- Department toggle (HRANA / PIĆE) -->
+  <nav class="dept-bar" aria-label="Meni">
+    <div class="dept-toggle" role="group">
+      <button class="dept-toggle__btn" data-dep="food" aria-pressed="true" type="button">HRANA</button>
+      <button class="dept-toggle__btn" data-dep="drinks" aria-pressed="false" type="button">PIĆE</button>
+    </div>
+  </nav>
 
   <!-- Search Bar -->
   <div class="search-container" id="search-container" hidden>

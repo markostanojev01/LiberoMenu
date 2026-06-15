@@ -7,6 +7,8 @@ Live at: https://libero-zajecar.com
 
 Static site — vanilla HTML/CSS/JS, no build step, hosted on GitHub Pages (main branch, root `/`).
 
+**Two sheets:** Food and drinks live in separate Google Sheets. Configure both URLs in `CONFIG` (`SHEET_CSV_URL`, `SHEET_CSV_URL_DRINKS`). Drinks use a slimmer schema (no image / ingredients / allergens). Each department caches independently in localStorage.
+
 - `index.html` — single-page entry point
 - `style.css` — full design system with CSS custom properties
 - `app.js` — core logic: data fetching, CSV parsing, rendering, search, sort, category filter, lazy loading, offline detection
