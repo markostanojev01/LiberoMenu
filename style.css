@@ -1559,30 +1559,69 @@ body:not(.view-landing) #landing { display: none; }
 
 .dept-toggle__btn--active {
   background: var(--color-primary);
-  color: var(--color-text);
+  color: var(--color-text-on-primary);
 }
 
 .dept-toggle__btn--active:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--color-text);
+  box-shadow: inset 0 0 0 2px var(--color-text-on-primary);
 }
 
 .dept-toggle__btn:not(.dept-toggle__btn--active):hover {
   background: var(--color-primary-light);
 }
 
-/* Drinks view: switch toggle accent from gold to teal — sub-brand cue */
-.view-drinks .dept-toggle {
-  border-color: #0F766E;
+/* ----------------------------------------------------------
+   DRINKS DARK THEME — token flip + premium polish for PIĆE
+   ---------------------------------------------------------- */
+body.view-drinks {
+  --color-bg: #0B0B0F;
+  --color-card: #18181C;
+  --color-text: #F5F5F5;
+  --color-text-secondary: #B5B5B5;
+  --color-text-muted: #828289;
+  --color-text-on-primary: #1A1A1A;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-dashed: rgba(255, 255, 255, 0.16);
+  --color-primary-dark: var(--color-primary);
+  --color-primary-light: rgba(255, 207, 64, 0.16);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 14px 40px rgba(0, 0, 0, 0.7);
+
+  background: var(--color-bg);
 }
-.view-drinks .dept-toggle__btn {
-  color: #0F766E;
+
+/* Dropdown chevron — light stroke on dark */
+.view-drinks .category-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23B5B5B5' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 }
-.view-drinks .dept-toggle__btn--active {
-  background: #115E59;
-  color: #FFFFFF;
+
+/* Waiter summary has hardcoded #FFFFFF — override for dark */
+.view-drinks .waiter-summary {
+  background: var(--color-bg);
 }
-.view-drinks .dept-toggle__btn:not(.dept-toggle__btn--active):hover {
-  background: #CCFBF1;
+
+/* Premium polish: thin gold rail under the header (lounge bar feel) */
+.view-drinks .header {
+  box-shadow: 0 1px 0 rgba(255, 207, 64, 0.10);
+}
+
+/* Premium polish: gradient gold underline on category headers */
+.view-drinks .category-header::after {
+  background: linear-gradient(90deg, transparent 0%, var(--color-primary) 50%, transparent 100%);
+  width: 80px;
+  height: 2px;
+}
+
+/* Premium polish: subtle inner-glow on drink cards (lit-from-within) */
+.view-drinks .drink-card {
+  box-shadow: inset 0 0 0 1px rgba(255, 207, 64, 0.05), var(--shadow-sm);
+}
+
+/* Premium polish: gentle gold lift on card hover */
+.view-drinks .drink-card:hover {
+  box-shadow: inset 0 0 0 1px rgba(255, 207, 64, 0.15), 0 6px 18px rgba(0, 0, 0, 0.55);
 }
 
 /* ----------------------------------------------------------
@@ -1634,7 +1673,7 @@ body:not(.view-landing) #landing { display: none; }
   height: 44px;
   border-radius: var(--radius-full);
   background: var(--color-primary);
-  color: var(--color-text);
+  color: var(--color-text-on-primary);
   font-size: 24px;
   font-weight: 700;
   line-height: 1;
