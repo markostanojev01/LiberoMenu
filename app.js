@@ -111,7 +111,13 @@ function setDepartment(dep) {
   const searchInput = document.getElementById("search-input");
   const searchClear = document.getElementById("search-clear");
   if (searchContainer) searchContainer.hidden = true;
-  if (searchInput) searchInput.value = "";
+  if (searchInput) {
+    searchInput.value = "";
+    searchInput.placeholder =
+      dep === "drinks"
+        ? "Pretraži pića..."
+        : "Pretraži jela ili sastojke...";
+  }
   if (searchClear) searchClear.hidden = true;
 
   // Sync sort buttons to default
